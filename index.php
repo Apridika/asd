@@ -35,7 +35,7 @@
 
         <div class="navbar-extra">
             <a href="#" id="search"><i data-feather="search"></i></a>
-            <a href="#" id="shopping-cart"><i data-feather="shopping-cart"></i></a>
+            <a href="checkout.php" id="shopping-cart"><i data-feather="shopping-cart"></i></a>
             <a href="login.php" id="login"><i data-feather="log-in"></i></a>
             <a href="#" id="hamburger"><i data-feather="menu"></i></a>
         </div>

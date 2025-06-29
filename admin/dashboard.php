@@ -4,6 +4,57 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     header("Location: ../login.php");
     exit;
 }
+require_once "../koneksi.php";
+
+// Jumlah produk
+$q_produk = mysqli_query($conn, "SELECT COUNT(*) AS total_produk FROM produk");
+$produk = mysqli_fetch_assoc($q_produk)['total_produk'];
+
+// Total stok
+$q_stok = mysqli_query($conn, "SELECT SUM(stok) AS total_stok FROM produk");
+$stok = mysqli_fetch_assoc($q_stok)['total_stok'];
+
+// Total nilai persediaan
+$q_nilai = mysqli_query($conn, "SELECT SUM(harga * stok) AS total_nilai FROM produk");
+$nilai = mysqli_fetch_assoc($q_nilai)['total_nilai'];
+
+// Jenis produk (count per jenis)
+$q_jenis = mysqli_query($conn, "
+    SELECT jenis, COUNT(*) AS jumlah 
+    FROM produk 
+    GROUP BY jenis
+");
+$jenis_data = [];
+while ($row = mysqli_fetch_assoc($q_jenis)) {
+    $jenis_data[] = $row;
+}
+
+
+// Total produk terjual hanya dari transaksi yang SELESAI
+$query_terjual = mysqli_query($conn, "
+  SELECT SUM(jumlah) AS total_terjual 
+  FROM transaksi 
+  WHERE status = 'Selesai'
+");
+$data_terjual = mysqli_fetch_assoc($query_terjual);
+$total_terjual = $data_terjual['total_terjual'] ?? 0;
+
+// Produk terjual per jenis hanya dari transaksi SELESAI
+$query = mysqli_query($conn, "
+  SELECT p.jenis, SUM(t.jumlah) AS total_terjual
+  FROM transaksi t
+  JOIN produk p ON t.produk_id = p.id
+  WHERE t.status = 'Selesai'
+  GROUP BY p.jenis
+");
+
+$jenis = [];
+$jumlah = [];
+
+while ($row = mysqli_fetch_assoc($query)) {
+    $jenis[] = $row['jenis'];
+    $jumlah[] = $row['total_terjual'];
+}
 
 ?>
 
@@ -16,7 +67,7 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Penjualan - Toko Tas</title>
+    <title>Dashboard - Toko Tas</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -104,6 +155,8 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     <!-- feather icons -->
     <script src="https://unpkg.com/feather-icons"></script>
 
+    
+
 
 </head>
 
@@ -122,7 +175,7 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
 
                     <ul class="nav flex-column px-2"> <!-- px-2 untuk padding horizontal -->
                         <li class="nav-item mb-2">
-                            <a href="../index.html" class="nav-link active text-white py-2"> <!-- py-2 -->
+                            <a href="../index.php" class="nav-link active text-white py-2"> <!-- py-2 -->
                                 <i data-feather='home'></i>
                                 <span class="px-2">
                                     Homepage
@@ -138,15 +191,15 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
                             </a>
                         </li>
                         <li class="nav-item mb-2">
-                            <a class="nav-link text-white py-2">
+                            <a href='transaksi/index.php' class="nav-link text-white py-2">
                                 <i class="fas fa-fw fa-receipt me-2"></i>
                                 <span class="px-1">
-                                    Transaksi
+                                Transaksi
                                 </span>
                             </a>
                         </li>
                         <li class="nav-item mb-2">
-                            <a class="nav-link text-white py-2">
+                            <a href='laporan/index.php' class="nav-link text-white py-2">
                                 <i class="fas fa-fw fa-chart-pie me-2"></i>
                                 <span class="px-1">
                                     Laporan
@@ -168,7 +221,7 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
             <!-- Main Content -->
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
                 <div class="maincontent">
-                    <h1 class="h2 mb-4">Dashboard Penjualan</h1>
+                    <h1 class="h2 mb-4">Dashboard Inventory</h1>
                 </div>
                 <!-- Metrics Row -->
                 <div class="row mb-4">
@@ -178,11 +231,13 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
                                 <div class="row no-gutters align-items-center">
                                     <div class="col mr-2">
                                         <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                            Total Pendapatan</div>
-                                        <div class="h5 mb-0 font-weight-bold text-gray-800">Rp12.450.000</div>
+                                            Total Produk</div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                            <?= $produk ?>
+                                        </div>
                                     </div>
                                     <div class="col-auto">
-                                        <i class="fas fa-money-bill-wave metric-icon text-primary"></i>
+                                        <!-- <i class="fas fa-money-bill-wave metric-icon text-primary"></i> -->
                                     </div>
                                 </div>
                             </div>
@@ -195,11 +250,13 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
                                 <div class="row no-gutters align-items-center">
                                     <div class="col mr-2">
                                         <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                                            Pendapatan Bersih</div>
-                                        <div class="h5 mb-0 font-weight-bold text-gray-800">Rp8.120.000</div>
+                                            Total Stok</div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                            <?= $stok ?>
+                                        </div>
                                     </div>
                                     <div class="col-auto">
-                                        <i class="fas fa-wallet metric-icon text-success"></i>
+                                        <!-- <i class="fas fa-wallet metric-icon text-success"></i> -->
                                     </div>
                                 </div>
                             </div>
@@ -212,25 +269,29 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
                                 <div class="row no-gutters align-items-center">
                                     <div class="col mr-2">
                                         <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
-                                            Total Pengeluaran</div>
-                                        <div class="h5 mb-0 font-weight-bold text-gray-800">Rp4.330.000</div>
+                                            Total Nilai persediaan</div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800">Rp
+                                            <?= number_format($nilai, 0, ',', '.') ?>
+                                        </div>
                                     </div>
                                     <div class="col-auto">
-                                        <i class="fas fa-file-invoice-dollar metric-icon text-danger"></i>
+                                        <!-- <i class="fas fa-file-invoice-dollar metric-icon text-danger"></i> -->
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="col-xl-3 col-md-6 mb-4">
+                    <!-- <div class="col-xl-3 col-md-6 mb-4">
                         <div class="card metric-card produk-terjual h-100 py-2">
                             <div class="card-body">
                                 <div class="row no-gutters align-items-center">
                                     <div class="col mr-2">
                                         <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
                                             Tas Terjual</div>
-                                        <div class="h5 mb-0 font-weight-bold text-gray-800">142</div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                            <?= $total_terjual ?> pcs
+                                        </div>
                                     </div>
                                     <div class="col-auto">
                                         <i class="fas fa-shopping-bag metric-icon text-info"></i>
@@ -238,12 +299,12 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </div> -->
                 </div>
 
                 <!-- Charts Row -->
                 <div class="row">
-                    <!-- Pendapatan vs Pengeluaran Chart -->
+                    <!-- Pendapatan vs Pengeluaran Chart
                     <div class="col-xl-8 mb-4">
                         <div class="card shadow">
                             <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
@@ -270,7 +331,7 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </div> -->
 
                     <!-- Kategori Tas Terlaris -->
                     <div class="col-xl-4 mb-4">
@@ -279,96 +340,25 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
                                 <h6 class="m-0 font-weight-bold text-primary">Kategori Terlaris</h6>
                             </div>
                             <div class="card-body">
-                                <div class="chart-container">
+                                <div class="chart-container" style="height: 300px;">
                                     <canvas id="bestCategoryChart"></canvas>
                                 </div>
+
                                 <div class="mt-4 text-center small">
                                     <span class="me-2">
-                                        <i class="fas fa-circle text-primary"></i> Tas Ransel
+                                        <i class="fas fa-circle text-primary"></i> Tas Backpack
                                     </span>
                                     <span class="me-2">
                                         <i class="fas fa-circle text-success"></i> Tas Selempang
                                     </span>
                                     <span class="me-2">
-                                        <i class="fas fa-circle text-info"></i> Tas Tote
+                                        <i class="fas fa-circle text-info"></i> Tas Laptop
                                     </span>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-
-                <!-- Recent Transactions -->
-                <div class="row mt-4">
-                    <div class="col-12">
-                        <div class="card shadow">
-                            <div class="card-header py-3">
-                                <h6 class="m-0 font-weight-bold text-primary">Transaksi Terakhir</h6>
-                            </div>
-                            <div class="card-body">
-                                <div class="table-responsive">
-                                    <table class="table table-bordered" width="100%" cellspacing="0">
-                                        <thead>
-                                            <tr>
-                                                <th>ID Transaksi</th>
-                                                <th>Produk</th>
-                                                <th>Pelanggan</th>
-                                                <th>Tanggal</th>
-                                                <th>Jumlah</th>
-                                                <th>Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td>#TRX-001</td>
-                                                <td>Tas Ransel Premium</td>
-                                                <td>Andi Wijaya</td>
-                                                <td>2023-05-15</td>
-                                                <td>Rp450.000</td>
-                                                <td><span class="badge bg-success">Selesai</span></td>
-                                            </tr>
-                                            <tr>
-                                                <td>#TRX-002</td>
-                                                <td>Tas Selempang Minimalis</td>
-                                                <td>Budi Santoso</td>
-                                                <td>2023-05-14</td>
-                                                <td>Rp320.000</td>
-                                                <td><span class="badge bg-success">Selesai</span></td>
-                                            </tr>
-                                            <tr>
-                                                <td>#TRX-003</td>
-                                                <td>Tas Tote Kanvas</td>
-                                                <td>Citra Dewi</td>
-                                                <td>2023-05-14</td>
-                                                <td>Rp275.000</td>
-                                                <td><span class="badge bg-warning">Proses</span></td>
-                                            </tr>
-                                            <tr>
-                                                <td>#TRX-004</td>
-                                                <td>Tas Ransel Sekolah</td>
-                                                <td>Dian Pratama</td>
-                                                <td>2023-05-13</td>
-                                                <td>Rp380.000</td>
-                                                <td><span class="badge bg-success">Selesai</span></td>
-                                            </tr>
-                                            <tr>
-                                                <td>#TRX-005</td>
-                                                <td>Tas Laptop</td>
-                                                <td>Eka Putri</td>
-                                                <td>2023-05-12</td>
-                                                <td>Rp420.000</td>
-                                                <td><span class="badge bg-danger">Dibatalkan</span></td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </main>
-        </div>
-    </div>
 
     <script>
         feather.replace();
@@ -376,3 +366,24 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
 
     <!-- java script -->
     <script src="script.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const ctx = document.getElementById('bestCategoryChart').getContext('2d');
+        const bestCategoryChart = new Chart(ctx, {
+            type: 'doughnut', // atau 'bar'
+            data: {
+                labels: <?= json_encode($jenis) ?>,
+                datasets: [{
+                    label: 'Produk Terjual',
+                    data: <?= json_encode($jumlah) ?>,
+                    backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+    </script>

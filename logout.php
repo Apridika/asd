@@ -125,7 +125,7 @@ header("Pragma: no-cache");
                 <p>Terima kasih telah menggunakan sistem kami. Anda akan diarahkan ke halaman login dalam beberapa detik.</p>
                 
                 <div class="d-grid gap-2">
-                    <a href="index.html" class="btn btn-primary">
+                    <a href="index.php" class="btn btn-primary">
                         <i class="fas fa-sign-in-alt me-2"></i>Kembali Ke Homepage
                     </a>
                 </div>
@@ -141,7 +141,7 @@ header("Pragma: no-cache");
     <script>
         // Redirect otomatis setelah 5 detik
         setTimeout(function() {
-            window.location.href = "index.html";
+            window.location.href = "index.php";
         }, 5000);
     </script>
 </body>
